@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Sequelize, DataTypes } = require('sequelize');
-const config = require('../config/app_config');
+const config = require('../config/app_config'); // ← CORREGIDO: app_config
 const logger = require('../utils/logger');
 
 // Configuración de Sequelize
@@ -35,6 +35,7 @@ const sequelize = new Sequelize(
 const db = {};
 
 // Leer todos los archivos de modelos en este directorio
+// Asegurarse de que los nuevos modelos (RefreshToken, AuditLog, etc.) están incluidos
 fs.readdirSync(__dirname)
   .filter(file => {
     return (

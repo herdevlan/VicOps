@@ -65,14 +65,39 @@ class UserController extends BaseController {
     ];
   }
 
-  async getAll(req, res, next) {
+  validateChangePassword() {
+    return [
+      body('currentPassword')
+        .notEmpty().withMessage('La contraseña actual es requerida'),
+      body('newPassword')
+        .isLength({ min: 6 }).withMessage('La nueva contraseña debe tener al menos 6 caracteres')
+        .notEmpty().withMessage('La nueva contraseña es requerida')
+    ];
+  }
+
+  validateResetPassword() {
+    return [
+      param('id').isInt().withMessage('ID debe ser un número entero'),
+      body('newPassword')
+        .isLength({ min: 6 }).withMessage('La nueva contraseña debe tener al menos 6 caracteres')
+        .notEmpty().withMessage('La nueva contraseña es requerida')
+    ];
+  }
+
+  validateChangeStatus() {
+    return [
+      param('id').isInt().withMessage('ID debe ser un número entero'),
+      body('estado')
+        .isBoolean().withMessage('estado debe ser true o false')
+        .notEmpty().withMessage('estado es requerido')
+    ];
+  }
+
+  getAll = async (req, res, next) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          error: errors.array().map(e => e.msg).join(', ')
-        });
+        return this.error(res, errors.array(), 400);
       }
 
       const { role_id, estado, limit, offset } = req.query;
@@ -86,127 +111,172 @@ class UserController extends BaseController {
         users = await userService.getAllUsers();
       }
       
-      // Aplicar paginación simple si se especifica
       if (limit) {
         const start = offset ? parseInt(offset) : 0;
         const end = start + parseInt(limit);
         users = users.slice(start, end);
       }
       
-      return res.status(200).json({
-        success: true,
-        data: users,
-        count: users.length
-      });
+      return this.success(res, users);
     } catch (error) {
-      console.error('Error en getAll users:', error);
       next(error);
     }
   }
 
-  async getById(req, res, next) {
+  getById = async (req, res, next) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          error: errors.array().map(e => e.msg).join(', ')
-        });
+        return this.error(res, errors.array(), 400);
       }
 
       const { id } = req.params;
       const user = await userService.getUserById(id);
-      return res.status(200).json({
-        success: true,
-        data: user
-      });
+      return this.success(res, user);
     } catch (error) {
       next(error);
     }
   }
 
-  async create(req, res, next) {
+  create = async (req, res, next) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          error: errors.array().map(e => e.msg).join(', ')
-        });
+        return this.error(res, errors.array(), 400);
       }
 
-      const user = await userService.createUser(req.body);
-      return res.status(201).json({
-        success: true,
-        message: 'Usuario creado exitosamente',
-        data: user
-      });
+      const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+      const userAgent = req.headers['user-agent'];
+      const requestingUserId = req.user.id;
+      
+      const user = await userService.createUser(req.body, ipAddress, userAgent, requestingUserId);
+      return this.success(res, user, 'Usuario creado exitosamente', 201);
     } catch (error) {
       next(error);
     }
   }
 
-  async update(req, res, next) {
+  update = async (req, res, next) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          error: errors.array().map(e => e.msg).join(', ')
-        });
+        return this.error(res, errors.array(), 400);
       }
 
       const { id } = req.params;
-      const user = await userService.updateUser(id, req.body);
-      return res.status(200).json({
-        success: true,
-        message: 'Usuario actualizado exitosamente',
-        data: user
-      });
+      const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+      const userAgent = req.headers['user-agent'];
+      const requestingUserId = req.user.id;
+      
+      const user = await userService.updateUser(id, req.body, ipAddress, userAgent, requestingUserId);
+      return this.success(res, user, 'Usuario actualizado exitosamente');
     } catch (error) {
       next(error);
     }
   }
 
-  async delete(req, res, next) {
+  delete = async (req, res, next) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          error: errors.array().map(e => e.msg).join(', ')
-        });
+        return this.error(res, errors.array(), 400);
       }
 
       const { id } = req.params;
-      await userService.deleteUser(id);
-      return res.status(200).json({
-        success: true,
-        message: 'Usuario eliminado exitosamente'
-      });
+      const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+      const userAgent = req.headers['user-agent'];
+      const requestingUserId = req.user.id;
+      
+      await userService.deleteUser(id, ipAddress, userAgent, requestingUserId);
+      return this.success(res, null, 'Usuario eliminado exitosamente');
     } catch (error) {
       next(error);
     }
   }
 
-  async changeStatus(req, res, next) {
+  changeStatus = async (req, res, next) => {
     try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return this.error(res, errors.array(), 400);
+      }
+
       const { id } = req.params;
       const { estado } = req.body;
+      const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+      const userAgent = req.headers['user-agent'];
+      const requestingUserId = req.user.id;
       
-      if (estado === undefined) {
-        return res.status(400).json({
-          success: false,
-          error: 'El campo estado es requerido'
-        });
+      const user = await userService.changeUserStatus(id, estado, ipAddress, userAgent, requestingUserId);
+      return this.success(res, user, `Usuario ${estado ? 'activado' : 'desactivado'} exitosamente`);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  changePassword = async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return this.error(res, errors.array(), 400);
       }
+
+      const { currentPassword, newPassword } = req.body;
+      const userId = req.user.id;
+      const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+      const userAgent = req.headers['user-agent'];
       
-      const user = await userService.changeUserStatus(id, estado);
-      return res.status(200).json({
-        success: true,
-        message: `Usuario ${estado ? 'activado' : 'desactivado'} exitosamente`,
-        data: user
-      });
+      await userService.changePassword(userId, currentPassword, newPassword, ipAddress, userAgent);
+      return this.success(res, null, 'Contraseña actualizada exitosamente');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  resetPassword = async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return this.error(res, errors.array(), 400);
+      }
+
+      const { id } = req.params;
+      const { newPassword } = req.body;
+      const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+      const userAgent = req.headers['user-agent'];
+      const requestingUserId = req.user.id;
+      
+      await userService.resetPassword(id, newPassword, ipAddress, userAgent, requestingUserId);
+      return this.success(res, null, 'Contraseña reseteada exitosamente');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  getStatistics = async (req, res, next) => {
+    try {
+      const stats = await userService.getStatistics();
+      return this.success(res, stats);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  getAuditLogs = async (req, res, next) => {
+    try {
+      const { userId, limit } = req.query;
+      const logs = await userService.getAuditLogs(userId, limit || 50);
+      return this.success(res, logs);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  getRecentlyActive = async (req, res, next) => {
+    try {
+      const { limit } = req.query;
+      const users = await userService.getRecentlyActiveUsers(limit || 10);
+      return this.success(res, users);
     } catch (error) {
       next(error);
     }
