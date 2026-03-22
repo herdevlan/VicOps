@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Sequelize, DataTypes } = require('sequelize');
-const config = require('../config/app_config'); // ← CORREGIDO: app_config
+const config = require('../config/app_config');
 const logger = require('../utils/logger');
 
 // Configuración de Sequelize
@@ -21,7 +21,7 @@ const sequelize = new Sequelize(
       createdAt: 'created_at',
       updatedAt: 'updated_at',
       deletedAt: 'deleted_at',
-      paranoid: true // Soft deletes
+      paranoid: true
     },
     pool: {
       max: 10,
@@ -34,8 +34,7 @@ const sequelize = new Sequelize(
 
 const db = {};
 
-// Leer todos los archivos de modelos en este directorio
-// Asegurarse de que los nuevos modelos (RefreshToken, AuditLog, etc.) están incluidos
+// Leer todos los archivos de modelos
 fs.readdirSync(__dirname)
   .filter(file => {
     return (
@@ -51,7 +50,7 @@ fs.readdirSync(__dirname)
     logger.debug(`📦 Modelo cargado: ${model.name}`);
   });
 
-// Establecer asociaciones después de cargar todos los modelos
+// Establecer asociaciones
 Object.keys(db).forEach(modelName => {
   if (db[modelName].associate) {
     db[modelName].associate(db);
@@ -59,24 +58,7 @@ Object.keys(db).forEach(modelName => {
   }
 });
 
-// Añadir sequelize y Sequelize al objeto db
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
-
-// Probar conexión
-const testConnection = async () => {
-  try {
-    await sequelize.authenticate();
-    logger.info('✅ Conexión a PostgreSQL establecida correctamente');
-  } catch (error) {
-    logger.error('❌ Error al conectar con PostgreSQL:', { error: error.message });
-    throw error;
-  }
-};
-
-// Ejecutar test de conexión inmediatamente (no bloqueante)
-testConnection().catch(err => {
-  logger.error('Fallo en conexión inicial a DB:', err.message);
-});
 
 module.exports = db;

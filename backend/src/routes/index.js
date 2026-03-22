@@ -5,6 +5,10 @@ const router = express.Router();
 // Importar módulos de rutas
 const authRoutes = require('./authRoutes');
 const userRoutes = require('./userRoutes');
+const studentRoutes = require('./studentRoutes');
+const subjectRoutes = require('./subjectRoutes');
+const courseRoutes = require('./courseRoutes');
+const enrollmentRoutes = require('./enrollmentRoutes');
 const gradeRoutes = require('./gradeRoutes');
 const reportRoutes = require('./reportRoutes');
 
@@ -15,7 +19,7 @@ router.get('/health', (req, res) => {
     message: 'API funcionando correctamente',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
-    version: '1.0.0'
+    version: '2.0.0'
   });
 });
 
@@ -23,11 +27,15 @@ router.get('/health', (req, res) => {
 router.get('/info', (req, res) => {
   res.json({
     name: 'Sistema de Monitoreo Académico',
-    version: '1.0.0',
+    version: '2.0.0',
     status: 'operational',
     endpoints: {
       auth: '/api/auth',
       users: '/api/users',
+      students: '/api/students',
+      subjects: '/api/subjects',
+      courses: '/api/courses',
+      enrollments: '/api/enrollments',
       grades: '/api/grades',
       reports: '/api/reports'
     }
@@ -37,6 +45,10 @@ router.get('/info', (req, res) => {
 // Montar rutas por módulo
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
+router.use('/students', studentRoutes);
+router.use('/subjects', subjectRoutes);
+router.use('/courses', courseRoutes);
+router.use('/enrollments', enrollmentRoutes);
 router.use('/grades', gradeRoutes);
 router.use('/reports', reportRoutes);
 
