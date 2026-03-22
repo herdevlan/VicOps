@@ -1,0 +1,79 @@
+# VARIABLES DE ENTORNO
+
+.env
+.env.*
+!.env.example
+
+# LOGS
+
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# DEPENDENCIAS
+
+node_modules/
+
+# BUILD
+
+dist/
+build/
+
+# BASE DE DATOS
+
+*.sqlite
+*.sqlite3
+*.db
+*.sql
+*.dump
+
+# UPLOADS Y TEMPORALES
+
+uploads/
+tmp/
+
+# ARCHIVOS SENSIBLES
+
+*.pem
+*.key
+*.crt
+*.pfx
+
+# CACHE
+
+.cache/
+.eslintcache
+
+# TESTS
+
+coverage/
+.nyc_output/
+
+# EDITOR / IDE
+
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+
+# SISTEMA
+
+Thumbs.db
+Desktop.ini
+
+# ARCHIVOS TEMPORALES
+
+*.tmp
+*.temp
+*.swp
+*.bak
+
+# ARCHIVOS COMPRIMIDOS
+
+*.zip
+*.tar
+*.gz
+*.rar
