@@ -4,7 +4,10 @@ const authService = require('../services/authService');
 const { body, validationResult } = require('express-validator');
 
 class AuthController extends BaseController {
-  // Validación para login
+  constructor() {
+    super(); 
+  }
+
   validateLogin() {
     return [
       body('email')
@@ -17,7 +20,6 @@ class AuthController extends BaseController {
     ];
   }
 
-  // Validación para registro
   validateRegister() {
     return [
       body('email')
@@ -39,130 +41,100 @@ class AuthController extends BaseController {
     ];
   }
 
-  // Endpoint login
-  async login(req, res, next) {
+  validateRefresh() {
+    return [
+      body('refreshToken')
+        .notEmpty().withMessage('Refresh token es requerido')
+    ];
+  }
+
+  // Usar arrow functions para mantener el contexto de this
+  login = async (req, res, next) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        const errorMsg = errors.array().map(e => e.msg).join(', ');
-        return res.status(400).json({
-          success: false,
-          error: errorMsg
-        });
+        return this.error(res, errors.array(), 400);
       }
 
       const { email, password } = req.body;
-      const result = await authService.login(email, password);
-
-      return res.status(200).json(result);
-    } catch (error) {
-      if (error.name === 'AuthenticationError') {
-        return res.status(401).json({
-          success: false,
-          error: error.message
-        });
-      }
-      console.error('Error login:', error);
-      return res.status(500).json({
-        success: false,
-        error: 'Error interno del servidor'
-      });
-    }
-  }
-
-  // Endpoint register
-  async register(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        const errorMsg = errors.array().map(e => e.msg).join(', ');
-        return res.status(400).json({
-          success: false,
-          error: errorMsg
-        });
-      }
-
-      const { profileType, profileData, ...userData } = req.body;
-      const result = await authService.register(
-        userData,
-        profileData || {},
-        profileType || 'student'
-      );
-
-      return res.status(201).json(result);
-    } catch (error) {
-      console.error('Error register:', error);
-      return res.status(500).json({
-        success: false,
-        error: 'Error interno del servidor'
-      });
-    }
-  }
-
-  // Endpoint logout
-  async logout(req, res, next) {
-    try {
-      return res.status(200).json({
-        success: true,
-        message: 'Sesión cerrada correctamente'
-      });
+      const userAgent = req.headers['user-agent'];
+      const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+      
+      const result = await authService.login(email, password, userAgent, ipAddress);
+      
+      return this.success(res, result, 'Login exitoso');
     } catch (error) {
       next(error);
     }
   }
 
-  //  Endpoint me CORREGIDO - SIN DEPENDER DE this.success/error
-  async me(req, res, next) {
+  refresh = async (req, res, next) => {
     try {
-      console.log('=== DEBUG me ===');
-      console.log('req.user:', req.user);
-      
-      // Verificar que req.user existe (debería estar después del middleware)
-      if (!req.user || !req.user.id) {
-        console.log('Usuario no autenticado');
-        return res.status(401).json({
-          success: false,
-          error: 'Usuario no autenticado'
-        });
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return this.error(res, errors.array(), 400);
       }
 
-      console.log('Buscando usuario con ID:', req.user.id);
+      const { refreshToken } = req.body;
+      const userAgent = req.headers['user-agent'];
+      const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
       
-      // Obtener el usuario completo con su rol
-      const user = await authService.getUserById(req.user.id);
+      const result = await authService.refreshAccessToken(refreshToken, userAgent, ipAddress);
       
-      if (!user) {
-        console.log('Usuario no encontrado en BD');
-        return res.status(404).json({
-          success: false,
-          error: 'Usuario no encontrado'
-        });
-      }
-
-      console.log('Usuario encontrado:', user.email);
-      
-      // Devolver la información del usuario
-      return res.status(200).json({
-        success: true,
-        message: 'Perfil obtenido correctamente',
-        data: {
-          id: user.id,
-          email: user.email,
-          nombre: user.nombre,
-          apellido: user.apellido,
-          ci: user.ci,
-          role: user.role
-        }
-      });
-      
+      return this.success(res, result, 'Token refrescado exitosamente');
     } catch (error) {
-      console.error('Error detallado en me:', error);
-      console.error('Stack trace:', error.stack);
+      next(error);
+    }
+  }
+
+  logout = async (req, res, next) => {
+    try {
+      const refreshToken = req.body.refreshToken;
+      await authService.logout(refreshToken);
+      return this.success(res, null, 'Sesión cerrada correctamente');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  logoutAll = async (req, res, next) => {
+    try {
+      const userId = req.user.id;
+      await authService.logoutAll(userId);
+      return this.success(res, null, 'Todas las sesiones cerradas correctamente');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  register = async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return this.error(res, errors.array(), 400);
+      }
+
+      const { profileType, profileData, ...userData } = req.body;
       
-      return res.status(500).json({
-        success: false,
-        error: error.message || 'Error interno del servidor'
-      });
+      const result = await authService.register(
+        userData,
+        profileData || {},
+        profileType || 'student'
+      );
+      
+      return this.success(res, result, 'Registro exitoso', 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  me = async (req, res, next) => {
+    try {
+      const { id } = req.user;
+      const user = await authService.getUserById(id);
+      return this.success(res, user);
+    } catch (error) {
+      next(error);
     }
   }
 }

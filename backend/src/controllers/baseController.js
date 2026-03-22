@@ -1,6 +1,6 @@
 // backend/src/controllers/baseController.js
 class BaseController {
-  constructor(service) {
+  constructor(service = null) {  
     this.service = service;
   }
 
@@ -28,12 +28,15 @@ class BaseController {
     });
   }
 
-  // CORREGIDO: Método error que maneja diferentes formatos
+  // CORREGIDO: Método error que maneja diferentes formatos (incluyendo arrays)
   error(res, error, statusCode = 400) {
     let errorMessage = 'Error desconocido';
     
     if (typeof error === 'string') {
       errorMessage = error;
+    } else if (Array.isArray(error)) {
+      // Manejar array de errores de express-validator
+      errorMessage = error.map(e => e.msg).join(', ');
     } else if (error && error.message) {
       errorMessage = error.message;
     } else if (error && error.msg) {
@@ -49,6 +52,9 @@ class BaseController {
   // Método base para obtener todos
   async getAll(req, res, next) {
     try {
+      if (!this.service) {
+        throw new Error('Service not injected');
+      }
       const data = await this.service.getAll();
       return this.success(res, data);
     } catch (error) {
@@ -59,6 +65,9 @@ class BaseController {
   // Método base para obtener por ID
   async getById(req, res, next) {
     try {
+      if (!this.service) {
+        throw new Error('Service not injected');
+      }
       const { id } = req.params;
       const data = await this.service.getById(id);
       return this.success(res, data);
@@ -70,6 +79,9 @@ class BaseController {
   // Método base para crear
   async create(req, res, next) {
     try {
+      if (!this.service) {
+        throw new Error('Service not injected');
+      }
       const data = await this.service.create(req.body);
       return this.success(res, data, 'Creado exitosamente', 201);
     } catch (error) {
@@ -80,6 +92,9 @@ class BaseController {
   // Método base para actualizar
   async update(req, res, next) {
     try {
+      if (!this.service) {
+        throw new Error('Service not injected');
+      }
       const { id } = req.params;
       const data = await this.service.update(id, req.body);
       return this.success(res, data, 'Actualizado exitosamente');
@@ -91,6 +106,9 @@ class BaseController {
   // Método base para eliminar
   async delete(req, res, next) {
     try {
+      if (!this.service) {
+        throw new Error('Service not injected');
+      }
       const { id } = req.params;
       await this.service.delete(id);
       return this.success(res, null, 'Eliminado exitosamente');

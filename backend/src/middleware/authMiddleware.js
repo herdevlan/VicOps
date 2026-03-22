@@ -1,79 +1,69 @@
 // backend/src/middleware/authMiddleware.js
-const jwt = require('jsonwebtoken');
-const { User, Role } = require('../models');
-const config = require('../config/app_config');
+const authService = require('../services/authService');
+const { AuthenticationError } = require('../utils/errors');
+const logger = require('../utils/logger');
 
 const authMiddleware = async (req, res, next) => {
   try {
-    const authHeader = req.headers['authorization'];
-    if (!authHeader) {
-      return res.status(401).json({
-        success: false,
-        error: 'Token no provisto'
-      });
-    }
-
-    const token = authHeader.split(' ')[1];
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        error: 'Token inválido'
-      });
-    }
-
-    // Verificar token
-    const decoded = jwt.verify(token, config.jwtSecret);
-
-    // Buscar usuario en base de datos con su rol
-    const user = await User.findByPk(decoded.id, {
-      include: [{ model: Role, as: 'role' }]
-    });
+    const authHeader = req.headers.authorization;
     
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Usuario no encontrado'
-      });
+    if (!authHeader) {
+      throw new AuthenticationError('Token no proporcionado');
     }
 
-    if (!user.estado) {
-      return res.status(401).json({
-        success: false,
-        error: 'Usuario inactivo'
-      });
+    const parts = authHeader.split(' ');
+    if (parts.length !== 2 || parts[0] !== 'Bearer') {
+      throw new AuthenticationError('Formato de token inválido. Use: Bearer <token>');
     }
 
-    // Adjuntar información del usuario al request
-    req.user = {
-      id: user.id,
-      email: user.email,
-      nombre: user.nombre,
-      apellido: user.apellido,
-      ci: user.ci,
-      role_id: user.role_id,
-      role: user.role
-    };
+    const token = parts[1];
+    
+    // Verificar token
+    const decoded = authService.verifyAccessToken(token);
+    
+    if (!decoded) {
+      throw new AuthenticationError('Token inválido');
+    }
 
+    // Adjuntar usuario al request
+    req.user = decoded;
+    
+    // Log de acceso (opcional, para debugging)
+    logger.debug(`Usuario autenticado: ${decoded.email} (ID: ${decoded.id})`);
+    
     next();
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        success: false,
-        error: 'Token inválido'
-      });
-    }
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        error: 'Token expirado'
-      });
-    }
-    console.error('Error en auth middleware:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Error interno del servidor'
-    });
+    next(error);
   }
 };
 
+// Middleware para verificar si el token está próximo a expirar
+const checkTokenExpiry = (thresholdMinutes = 5) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return next();
+    }
+    
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return next();
+    
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = authService.verifyAccessToken(token);
+      const exp = decoded.exp;
+      const now = Math.floor(Date.now() / 1000);
+      const timeLeft = exp - now;
+      
+      if (timeLeft > 0 && timeLeft <= thresholdMinutes * 60) {
+        res.setHeader('X-Token-Expiring', 'true');
+        res.setHeader('X-Token-Expires-In', timeLeft);
+      }
+    } catch (error) {
+      // Token inválido, continuar
+    }
+    next();
+  };
+};
+
 module.exports = authMiddleware;
+module.exports.checkTokenExpiry = checkTokenExpiry;
