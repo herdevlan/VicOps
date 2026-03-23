@@ -112,13 +112,68 @@ class StudentController extends BaseController {
         return this.error(res, errors.array(), 400);
       }
 
-      const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-      const userAgent = req.headers['user-agent'];
-      const requestingUserId = req.user.id;
+      const { ci, nombre, apellido, fecha_nacimiento, telefono, email, tutor_nombre, tutor_telefono } = req.body;
       
-      const student = await studentService.createStudent(req.body, ipAddress, userAgent, requestingUserId);
-      return this.success(res, student, 'Estudiante creado exitosamente', 201);
+      console.log('=== CREAR ESTUDIANTE ===');
+      console.log('Datos:', { ci, nombre, apellido, fecha_nacimiento, telefono, email, tutor_nombre, tutor_telefono });
+      
+      // Validar campos obligatorios
+      if (!ci || !nombre || !apellido) {
+        return res.status(400).json({
+          success: false,
+          error: 'Los campos CI, Nombre y Apellido son obligatorios'
+        });
+      }
+      
+      const { sequelize } = require('../models');
+      
+      // Verificar si ya existe un estudiante con el mismo CI
+      const existing = await sequelize.query(`
+        SELECT id FROM students WHERE ci = :ci
+      `, {
+        replacements: { ci },
+        type: sequelize.QueryTypes.SELECT
+      });
+      
+      if (existing.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Ya existe un estudiante con este CI'
+        });
+      }
+      
+      // Insertar nuevo estudiante
+      await sequelize.query(`
+        INSERT INTO students 
+        (ci, nombre, apellido, fecha_nacimiento, telefono, email, tutor_nombre, tutor_telefono, estado, created_at, updated_at)
+        VALUES (:ci, :nombre, :apellido, :fecha_nacimiento, :telefono, :email, :tutor_nombre, :tutor_telefono, true, NOW(), NOW())
+      `, {
+        replacements: {
+          ci,
+          nombre,
+          apellido,
+          fecha_nacimiento: fecha_nacimiento || null,
+          telefono: telefono || null,
+          email: email || null,
+          tutor_nombre: tutor_nombre || null,
+          tutor_telefono: tutor_telefono || null
+        }
+      });
+      
+      // Obtener el estudiante recién creado
+      const newStudent = await sequelize.query(`
+        SELECT * FROM students WHERE ci = :ci ORDER BY id DESC LIMIT 1
+      `, {
+        replacements: { ci },
+        type: sequelize.QueryTypes.SELECT
+      });
+      
+      console.log('✅ Estudiante creado:', newStudent[0]);
+      
+      return this.success(res, newStudent[0], 'Estudiante creado exitosamente', 201);
+      
     } catch (error) {
+      console.error('❌ Error en create estudiante:', error);
       next(error);
     }
   }
@@ -237,6 +292,34 @@ class StudentController extends BaseController {
       const stats = await studentService.getStudentStatistics();
       return this.success(res, stats);
     } catch (error) {
+      next(error);
+    }
+  }
+
+  // NUEVO MÉTODO: Obtener estudiantes con su promedio
+  getStudentsWithAverage = async (req, res, next) => {
+    try {
+      const { sequelize } = require('../models');
+      
+      const students = await sequelize.query(`
+        SELECT 
+          s.id,
+          s.ci,
+          s.nombre,
+          s.apellido,
+          COALESCE(AVG(g.nota), 0) as promedio
+        FROM students s
+        LEFT JOIN grades g ON g.student_id = s.id
+        WHERE s.estado = true
+        GROUP BY s.id
+        ORDER BY promedio DESC, s.apellido ASC
+      `, {
+        type: sequelize.QueryTypes.SELECT
+      });
+      
+      return this.success(res, students);
+    } catch (error) {
+      console.error('Error en getStudentsWithAverage:', error);
       next(error);
     }
   }

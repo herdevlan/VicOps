@@ -1,4 +1,3 @@
-// backend/src/controllers/courseController.js
 const BaseController = require('./baseController');
 const courseService = require('../services/courseService');
 const { body, param, query, validationResult } = require('express-validator');
@@ -37,15 +36,10 @@ class CourseController extends BaseController {
         .isInt().withMessage('subject_id debe ser un número entero')
         .notEmpty().withMessage('El subject_id es requerido'),
       body('teacher_id').optional().isInt().withMessage('teacher_id debe ser un número entero'),
+      // TURNO: AHORA ES OBLIGATORIO Y CON VALIDACIÓN CLARA
       body('turno')
-        .optional()
-        .custom((value) => {
-          const validValues = ['mañana', 'tarde', 'noche'];
-          if (!validValues.includes(value)) {
-            throw new Error('Turno debe ser mañana, tarde o noche');
-          }
-          return true;
-        }),
+        .notEmpty().withMessage('El turno es requerido')
+        .isIn(['mañana', 'tarde', 'noche']).withMessage('Turno debe ser: mañana, tarde o noche'),
       body('capacidad')
         .optional()
         .isInt({ min: 1, max: 50 })
@@ -109,8 +103,14 @@ class CourseController extends BaseController {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        // Mostrar errores detallados para depuración
+        console.log('Errores de validación:', errors.array());
         return this.error(res, errors.array(), 400);
       }
+
+      // Log para depuración
+      console.log('Datos recibidos para crear curso:', req.body);
+      console.log('Turno recibido:', req.body.turno, 'tipo:', typeof req.body.turno);
 
       const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
       const userAgent = req.headers['user-agent'];
@@ -119,6 +119,7 @@ class CourseController extends BaseController {
       const course = await courseService.createCourse(req.body, ipAddress, userAgent, requestingUserId);
       return this.success(res, course, 'Curso creado exitosamente', 201);
     } catch (error) {
+      console.error('Error en create course:', error);
       next(error);
     }
   }
@@ -169,10 +170,43 @@ class CourseController extends BaseController {
       }
 
       const { id } = req.params;
-      const students = await courseService.getCourseStudents(id);
-      return this.success(res, students);
+      console.log('=== getStudents ===');
+      console.log('Curso ID:', id);
+      
+      const { sequelize } = require('../models');
+      
+      // Consulta SQL directa - más confiable que las asociaciones
+      const students = await sequelize.query(`
+        SELECT 
+          s.id,
+          s.ci,
+          s.nombre,
+          s.apellido,
+          s.email,
+          s.telefono
+        FROM enrollments e
+        INNER JOIN students s ON e.student_id = s.id
+        WHERE e.course_id = :courseId AND e.estado = 'activo'
+        ORDER BY s.apellido ASC
+      `, {
+        replacements: { courseId: parseInt(id) },
+        type: sequelize.QueryTypes.SELECT
+      });
+      
+      console.log('Estudiantes encontrados:', students.length);
+      
+      return res.json({
+        success: true,
+        data: students
+      });
+      
     } catch (error) {
-      next(error);
+      console.error('Error en getStudents:', error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+        stack: error.stack
+      });
     }
   }
 

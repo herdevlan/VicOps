@@ -84,5 +84,10 @@ router.get('/statistics/all',
   roleMiddleware(['Administrador']),
   studentController.getStatistics
 );
+// Obtener estudiantes con promedio (para dashboard y listado)
+router.get('/with-average', 
+  roleMiddleware(['Administrador', 'Director', 'Docente']),
+  studentController.getStudentsWithAverage
+);
 
 module.exports = router;

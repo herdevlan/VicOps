@@ -1,4 +1,3 @@
-// backend/src/repositories/dashboardRepository.js
 const { sequelize, Student, Course, Enrollment, Grade, Subject, User } = require('../models');
 const { Op } = require('sequelize');
 
@@ -72,7 +71,6 @@ class DashboardRepository {
   // ============================================
 
   async getStudentSubjectStatus(studentId, gestion = null, threshold = 51) {
-    // Obtener todas las calificaciones del estudiante agrupadas por materia
     const grades = await Grade.findAll({
       where: { student_id: studentId },
       include: [{
@@ -83,7 +81,6 @@ class DashboardRepository {
       }]
     });
     
-    // Agrupar por materia (subject_id)
     const subjectResults = {};
     for (const grade of grades) {
       if (!grade.course || !grade.course.subject) continue;
@@ -131,7 +128,8 @@ class DashboardRepository {
 
   async getAllStudentsSubjectStatus(gestion = null, threshold = 51) {
     const allStudents = await Student.findAll({
-      include: [{ model: User, as: 'user', attributes: ['nombre', 'apellido'] }]
+      include: [{ model: User, as: 'user', attributes: ['nombre', 'apellido'] }],
+      where: { estado: true }
     });
     
     const results = [];
@@ -270,7 +268,6 @@ class DashboardRepository {
       order: [['evaluacion_numero', 'ASC']]
     });
     
-    // Evolución por evaluación
     const evaluacionData = {};
     for (const grade of grades) {
       const evaluacion = grade.evaluacion_numero;
@@ -299,7 +296,6 @@ class DashboardRepository {
       });
     }
     
-    // Tendencia (si el rendimiento está mejorando o empeorando)
     const averages = evaluacionEvolution.filter(e => e.totalGrades > 0).map(e => e.average);
     let trend = 'estable';
     if (averages.length >= 2) {
@@ -332,7 +328,6 @@ class DashboardRepository {
       order: [['evaluacion_numero', 'ASC']]
     });
     
-    // Evolución por evaluación
     const evaluacionData = {};
     for (const grade of grades) {
       const evaluacion = grade.evaluacion_numero;
@@ -489,19 +484,26 @@ class DashboardRepository {
     };
   }
 
+  // ============================================
+  // DASHBOARD GENERAL (ADMIN) - CORREGIDO
+  // ============================================
+
   async getGeneralDashboard(gestion = null) {
     const [
       overallAverages,
       subjectStatusSummary,
       averageBySubject,
       courseEvolution,
-      alerts
+      alerts,
+      totalStudentsCount
     ] = await Promise.all([
       this.getAllStudentsOverallAverage(gestion),
       this.getAllStudentsSubjectStatus(gestion, 51),
       this.getAverageBySubject(gestion),
       this.getCourseEvolution(null, gestion),
-      this.getAcademicAlerts(51, gestion, 20)
+      this.getAcademicAlerts(51, gestion, 20),
+      // Contar TODOS los estudiantes (incluyendo los que no tienen notas)
+      sequelize.query(`SELECT COUNT(*) as total FROM students`, { type: sequelize.QueryTypes.SELECT })
     ]);
     
     const totalAverage = overallAverages.length > 0
@@ -512,12 +514,15 @@ class DashboardRepository {
     const totalApproved = subjectStatusSummary.reduce((sum, s) => sum + s.approved, 0);
     const totalAtRisk = subjectStatusSummary.reduce((sum, s) => sum + s.atRisk, 0);
     
+    // Total de estudiantes REAL (33 según tu base de datos)
+    const totalStudents = totalStudentsCount[0]?.total || 0;
+    
     return {
       gestion: gestion || 'todas',
       generatedAt: new Date().toISOString(),
       kpis: {
         overallAverage: parseFloat(totalAverage.toFixed(2)),
-        totalStudents: overallAverages.length,
+        totalStudents: totalStudents,  // AHORA SÍ: 33
         subjectSummary: {
           total: totalSubjects,
           approved: totalApproved,
