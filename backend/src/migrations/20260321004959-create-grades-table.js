@@ -60,9 +60,10 @@ module.exports = {
         onUpdate: 'CASCADE',
         onDelete: 'SET NULL'
       },
-      bimestre: {
+      evaluacion_numero: {
         type: Sequelize.INTEGER,
-        allowNull: true
+        allowNull: true,
+        comment: 'Número de evaluación (1, 2, 3, 4, 5, 6, etc.)'
       },
       created_at: {
         allowNull: false,
@@ -80,6 +81,7 @@ module.exports = {
     await queryInterface.addIndex('grades', ['course_id']);
     await queryInterface.addIndex('grades', ['user_id']);
     await queryInterface.addIndex('grades', ['tipo_evaluacion']);
+    await queryInterface.addIndex('grades', ['evaluacion_numero']);
     await queryInterface.addIndex('grades', ['fecha']);
     await queryInterface.addIndex('grades', ['student_id', 'course_id']);
   },

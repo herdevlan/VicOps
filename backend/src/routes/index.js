@@ -11,6 +11,7 @@ const courseRoutes = require('./courseRoutes');
 const enrollmentRoutes = require('./enrollmentRoutes');
 const gradeRoutes = require('./gradeRoutes');
 const reportRoutes = require('./reportRoutes');
+const dashboardRoutes = require('./dashboardRoutes');
 
 // Ruta de health check
 router.get('/health', (req, res) => {
@@ -29,6 +30,13 @@ router.get('/info', (req, res) => {
     name: 'Sistema de Monitoreo Académico',
     version: '2.0.0',
     status: 'operational',
+    kpis: {
+      kpi1: 'Promedio general del estudiante',
+      kpi2: 'Materias aprobadas vs materias en riesgo',
+      kpi3: 'Promedio por materia',
+      kpi4: 'Evolución del rendimiento académico',
+      kpi5: 'Alertas académicas (materias en riesgo)'
+    },
     endpoints: {
       auth: '/api/auth',
       users: '/api/users',
@@ -37,7 +45,8 @@ router.get('/info', (req, res) => {
       courses: '/api/courses',
       enrollments: '/api/enrollments',
       grades: '/api/grades',
-      reports: '/api/reports'
+      reports: '/api/reports',
+      dashboard: '/api/dashboard'
     }
   });
 });
@@ -51,5 +60,6 @@ router.use('/courses', courseRoutes);
 router.use('/enrollments', enrollmentRoutes);
 router.use('/grades', gradeRoutes);
 router.use('/reports', reportRoutes);
+router.use('/dashboard', dashboardRoutes);
 
 module.exports = router;

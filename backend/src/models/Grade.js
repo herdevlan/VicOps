@@ -32,8 +32,32 @@ module.exports = (sequelize, DataTypes) => {
       }
     },
     tipo_evaluacion: {
-      type: DataTypes.ENUM('primer_parcial', 'segundo_parcial', 'tercer_parcial', 'final', 'trabajo', 'examen', 'recuperatorio'),
-      allowNull: false
+      type: DataTypes.ENUM(
+        'primer_parcial', 
+        'segundo_parcial', 
+        'tercer_parcial', 
+        'final', 
+        'trabajo', 
+        'examen', 
+        'recuperatorio',
+        'evaluacion_1',
+        'evaluacion_2',
+        'evaluacion_3',
+        'evaluacion_4',
+        'evaluacion_5',
+        'evaluacion_6'
+      ),
+      allowNull: false,
+      defaultValue: 'evaluacion_1'
+    },
+    evaluacion_numero: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      validate: {
+        min: { args: [1], msg: 'El número de evaluación debe ser al menos 1' },
+        max: { args: [12], msg: 'El número de evaluación no puede ser mayor a 12' }
+      },
+      comment: 'Número de evaluación (1, 2, 3, 4, 5, 6, etc.)'
     },
     porcentaje: {
       type: DataTypes.INTEGER,
@@ -60,25 +84,18 @@ module.exports = (sequelize, DataTypes) => {
         model: 'users',
         key: 'id'
       }
-    },
-    bimestre: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      validate: {
-        min: { args: [1], msg: 'El bimestre debe ser entre 1 y 4' },
-        max: { args: [4], msg: 'El bimestre debe ser entre 1 y 4' }
-      }
     }
   }, {
     tableName: 'grades',
     timestamps: true,
     underscored: true,
-    paranoid: false,  // ✅ CAMBIADO: deshabilitar paranoid porque no existe deleted_at
+    paranoid: false,
     indexes: [
       { fields: ['student_id'] },
       { fields: ['course_id'] },
       { fields: ['user_id'] },
       { fields: ['tipo_evaluacion'] },
+      { fields: ['evaluacion_numero'] },
       { fields: ['fecha'] },
       { fields: ['student_id', 'course_id'] }
     ]
